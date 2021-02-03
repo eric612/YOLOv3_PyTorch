@@ -5,10 +5,11 @@ TRAINING_PARAMS = \
         "backbone_pretrained": "",
     },
     "yolo": {
-        "anchors": [[[116, 90], [156, 198], [373, 326]],
-                    [[30, 61], [62, 45], [59, 119]],
-                    [[10, 13], [16, 30], [33, 23]]],
+        "anchors": [[116, 90], [156, 198], [373, 326],
+                    [30, 61], [62, 45], [59, 119],
+                    [10, 13], [16, 30], [33, 23]],
         "classes": 80,
+        "mask":[[0,1,2],[3,4,5],[6,7,8]] ,
     },
     "batch_size": 16,
     "confidence_threshold": 0.5,
@@ -17,5 +18,6 @@ TRAINING_PARAMS = \
     "img_h": 416,
     "img_w": 416,
     "parallels": [0],
-    "pretrain_snapshot": "../weights/official_yolov3_weights_pytorch.pth",
+    #"pretrain_snapshot": "../weights/official_yolov3_weights_pytorch.pth",
+    "pretrain_snapshot": "../save/darknet_53/model.pth",
 }

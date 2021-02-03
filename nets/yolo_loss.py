@@ -7,9 +7,11 @@ from common.utils import bbox_iou
 
 
 class YOLOLoss(nn.Module):
-    def __init__(self, anchors, num_classes, img_size):
+    def __init__(self, anchors, mask, num_classes, img_size):
         super(YOLOLoss, self).__init__()
         self.anchors = anchors
+        self.mask = mask;
+        self.num_mask = len(mask)
         self.num_anchors = len(anchors)
         self.num_classes = num_classes
         self.bbox_attrs = 5 + num_classes
@@ -30,9 +32,9 @@ class YOLOLoss(nn.Module):
         in_w = input.size(3)
         stride_h = self.img_size[1] / in_h
         stride_w = self.img_size[0] / in_w
-        scaled_anchors = [(a_w / stride_w, a_h / stride_h) for a_w, a_h in self.anchors]
+        scaled_anchors = [(a_w / self.img_size[0], a_h / self.img_size[1]) for a_w, a_h in self.anchors]
 
-        prediction = input.view(bs,  self.num_anchors,
+        prediction = input.view(bs,  self.num_mask,
                                 self.bbox_attrs, in_h, in_w).permute(0, 1, 3, 4, 2).contiguous()
 
         # Get outputs
@@ -67,13 +69,17 @@ class YOLOLoss(nn.Module):
             return loss, loss_x.item(), loss_y.item(), loss_w.item(),\
                 loss_h.item(), loss_conf.item(), loss_cls.item()
         else:
+            scaled_anchors2 = [(scaled_anchors[self.mask[i]][:] ) for i in range(self.num_mask)]
+            print(scaled_anchors,scaled_anchors2,in_w,in_h)
+            scaled_anchors = scaled_anchors2
+            
             FloatTensor = torch.cuda.FloatTensor if x.is_cuda else torch.FloatTensor
             LongTensor = torch.cuda.LongTensor if x.is_cuda else torch.LongTensor
             # Calculate offsets for each grid
             grid_x = torch.linspace(0, in_w-1, in_w).repeat(in_w, 1).repeat(
-                bs * self.num_anchors, 1, 1).view(x.shape).type(FloatTensor)
+                bs * self.num_mask, 1, 1).view(x.shape).type(FloatTensor)
             grid_y = torch.linspace(0, in_h-1, in_h).repeat(in_h, 1).t().repeat(
-                bs * self.num_anchors, 1, 1).view(y.shape).type(FloatTensor)
+                bs * self.num_mask, 1, 1).view(y.shape).type(FloatTensor)
             # Calculate anchor w, h
             anchor_w = FloatTensor(scaled_anchors).index_select(1, LongTensor([0]))
             anchor_h = FloatTensor(scaled_anchors).index_select(1, LongTensor([1]))
@@ -83,8 +89,8 @@ class YOLOLoss(nn.Module):
             pred_boxes = FloatTensor(prediction[..., :4].shape)
             pred_boxes[..., 0] = x.data + grid_x
             pred_boxes[..., 1] = y.data + grid_y
-            pred_boxes[..., 2] = torch.exp(w.data) * anchor_w
-            pred_boxes[..., 3] = torch.exp(h.data) * anchor_h
+            pred_boxes[..., 2] = torch.exp(w.data) * anchor_w * in_w
+            pred_boxes[..., 3] = torch.exp(h.data) * anchor_h * in_h
             # Results
             _scale = torch.Tensor([stride_w, stride_h] * 2).type(FloatTensor)
             output = torch.cat((pred_boxes.view(bs, -1, 4) * _scale,
@@ -94,14 +100,14 @@ class YOLOLoss(nn.Module):
     def get_target(self, target, anchors, in_w, in_h, ignore_threshold):
         bs = target.size(0)
 
-        mask = torch.zeros(bs, self.num_anchors, in_h, in_w, requires_grad=False)
-        noobj_mask = torch.ones(bs, self.num_anchors, in_h, in_w, requires_grad=False)
-        tx = torch.zeros(bs, self.num_anchors, in_h, in_w, requires_grad=False)
-        ty = torch.zeros(bs, self.num_anchors, in_h, in_w, requires_grad=False)
-        tw = torch.zeros(bs, self.num_anchors, in_h, in_w, requires_grad=False)
-        th = torch.zeros(bs, self.num_anchors, in_h, in_w, requires_grad=False)
-        tconf = torch.zeros(bs, self.num_anchors, in_h, in_w, requires_grad=False)
-        tcls = torch.zeros(bs, self.num_anchors, in_h, in_w, self.num_classes, requires_grad=False)
+        mask = torch.zeros(bs, self.num_mask, in_h, in_w, requires_grad=False)
+        noobj_mask = torch.ones(bs, self.num_mask, in_h, in_w, requires_grad=False)
+        tx = torch.zeros(bs, self.num_mask, in_h, in_w, requires_grad=False)
+        ty = torch.zeros(bs, self.num_mask, in_h, in_w, requires_grad=False)
+        tw = torch.zeros(bs, self.num_mask, in_h, in_w, requires_grad=False)
+        th = torch.zeros(bs, self.num_mask, in_h, in_w, requires_grad=False)
+        tconf = torch.zeros(bs, self.num_mask, in_h, in_w, requires_grad=False)
+        tcls = torch.zeros(bs, self.num_mask, in_h, in_w, self.num_classes, requires_grad=False)
         for b in range(bs):
             for t in range(target.shape[1]):
                 if target[b, t].sum() == 0:
@@ -109,8 +115,8 @@ class YOLOLoss(nn.Module):
                 # Convert to position relative to box
                 gx = target[b, t, 1] * in_w
                 gy = target[b, t, 2] * in_h
-                gw = target[b, t, 3] * in_w
-                gh = target[b, t, 4] * in_h
+                gw = target[b, t, 3] 
+                gh = target[b, t, 4] 
                 # Get grid box indices
                 gi = int(gx)
                 gj = int(gy)
@@ -121,22 +127,36 @@ class YOLOLoss(nn.Module):
                                                                   np.array(anchors)), 1))
                 # Calculate iou between gt and anchor shapes
                 anch_ious = bbox_iou(gt_box, anchor_shapes)
-                # Where the overlap is larger than threshold set mask to zero (ignore)
-                noobj_mask[b, anch_ious > ignore_threshold, gj, gi] = 0
-                # Find the best matching anchor box
+                #print(anch_ious)
                 best_n = np.argmax(anch_ious)
-
-                # Masks
-                mask[b, best_n, gj, gi] = 1
-                # Coordinates
-                tx[b, best_n, gj, gi] = gx - gi
-                ty[b, best_n, gj, gi] = gy - gj
-                # Width and height
-                tw[b, best_n, gj, gi] = math.log(gw/anchors[best_n][0] + 1e-16)
-                th[b, best_n, gj, gi] = math.log(gh/anchors[best_n][1] + 1e-16)
-                # object
-                tconf[b, best_n, gj, gi] = 1
-                # One-hot encoding of label
-                tcls[b, best_n, gj, gi, int(target[b, t, 0])] = 1
+                #print(best_n)
+                # Where the overlap is larger than threshold set mask to zero (ignore)
+                #print(noobj_mask.shape)
+                anch_ious_this = anch_ious[self.mask] 
+                #print(anchor_shapes[self.mask] ,in_w,in_h)
+                noobj_mask[b, anch_ious_this > ignore_threshold, gj, gi] = 0
+                # Find the best matching anchor box
+                #print(best_n)
+                #print(best_n,self.mask)
+                if best_n in self.mask :
+                    
+                    best_n = self.mask.index(best_n)
+                    #print('convert to',best_n)
+                    #print(best_n)
+                    # Masks
+                    mask[b, best_n, gj, gi] = 1
+                    # Coordinates
+                    tx[b, best_n, gj, gi] = gx - gi
+                    ty[b, best_n, gj, gi] = gy - gj
+                    #print(gx - gi,gy - gj)
+                    # Width and height
+                    #print(best_n,anchors[best_n],anchors)
+                    #print(anchors[best_n],gw,gh)
+                    tw[b, best_n, gj, gi] = math.log(gw/anchors[best_n][0] + 1e-16)
+                    th[b, best_n, gj, gi] = math.log(gh/anchors[best_n][1] + 1e-16)
+                    # object
+                    tconf[b, best_n, gj, gi] = 1
+                    # One-hot encoding of label
+                    tcls[b, best_n, gj, gi, int(target[b, t, 0])] = 1
 
         return mask, noobj_mask, tx, ty, tw, th, tconf, tcls

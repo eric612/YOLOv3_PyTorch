@@ -5,11 +5,13 @@ TRAINING_PARAMS = \
         "backbone_pretrained": "../weights/darknet53_weights_pytorch.pth", #  set empty to disable
     },
     "yolo": {
-        "anchors": [[[116, 90], [156, 198], [373, 326]],
-                    [[30, 61], [62, 45], [59, 119]],
-                    [[10, 13], [16, 30], [33, 23]]],
+        "anchors": [[116, 90], [156, 198], [373, 326],
+                    [30, 61], [62, 45], [59, 119],
+                    [10, 13], [16, 30], [33, 23]],
         "classes": 80,
+        "mask":[[0,1,2],[3,4,5],[6,7,8]] ,
     },
+
     "lr": {
         "backbone_lr": 0.001,
         "other_lr": 0.01,
@@ -21,13 +23,13 @@ TRAINING_PARAMS = \
         "type": "sgd",
         "weight_decay": 4e-05,
     },
-    "batch_size": 16,
+    "batch_size": 8,
     "train_path": "../data/coco/trainvalno5k.txt",
     "epochs": 100,
     "img_h": 416,
     "img_w": 416,
-    "parallels": [0,1,2,3],                         #  config GPU device
-    "working_dir": "YOUR_WORKING_DIR",              #  replace with your working dir
+    "parallels": [0],                         #  config GPU device
+    "working_dir": "../save/",              #  replace with your working dir
     "pretrain_snapshot": "",                        #  load checkpoint
     "evaluate_type": "", 
     "try": 0,

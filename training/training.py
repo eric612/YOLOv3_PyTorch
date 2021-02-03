@@ -69,7 +69,7 @@ def train(config):
     # YOLO loss with 3 scales
     yolo_losses = []
     for i in range(3):
-        yolo_losses.append(YOLOLoss(config["yolo"]["anchors"][i],
+        yolo_losses.append(YOLOLoss(config["yolo"]["anchors"],config["yolo"]["mask"][i],
                                     config["yolo"]["classes"], (config["img_w"], config["img_h"])))
 
     # DataLoader
