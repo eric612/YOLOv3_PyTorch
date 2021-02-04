@@ -149,6 +149,7 @@ class YOLOLoss(nn.Module):
                     #print(best_n)
                     # Masks
                     mask[b, best_n, gj, gi] = 1
+                    noobj_mask[b, best_n, gj, gi] = 0
                     # Coordinates
                     tx[b, best_n, gj, gi] = gx - gi
                     ty[b, best_n, gj, gi] = gy - gj
