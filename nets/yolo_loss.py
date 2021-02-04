@@ -136,7 +136,7 @@ class YOLOLoss(nn.Module):
                 #print(noobj_mask.shape)
                 anch_ious_this = anch_ious[self.mask] 
                 #print(anchor_shapes[self.mask] ,in_w,in_h)
-                noobj_mask[b, anch_ious_this > ignore_threshold, gj, gi] = 0
+                #noobj_mask[b, anch_ious_this > ignore_threshold, gj, gi] = 0
                 # Find the best matching anchor box
                 #print(best_n)
                 #print(best_n,self.mask)
