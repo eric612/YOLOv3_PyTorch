@@ -3,7 +3,7 @@ import torch.nn as nn
 import numpy as np
 import math
 
-from common.utils import bbox_iou
+from common.utils import *
 
 
 class YOLOLoss(nn.Module):
@@ -125,9 +125,11 @@ class YOLOLoss(nn.Module):
                 # Get shape of anchor box
                 anchor_shapes = torch.FloatTensor(np.concatenate((np.zeros((self.num_anchors, 2)),
                                                                   np.array(anchors)), 1))
+                #print('anchor_shapes',anchor_shapes)
                 # Calculate iou between gt and anchor shapes
-                anch_ious = bbox_iou(gt_box, anchor_shapes)
-                #print(anch_ious)
+                #anch_ious = bbox_iou(gt_box, anchor_shapes,x1y1x2y2=False)
+                anch_ious = find_jaccard_overlap(gt_box, anchor_shapes)[0]                
+                #print('anch_ious',gt_box,anch_ious)
                 best_n = np.argmax(anch_ious)
                 #print(best_n)
                 # Where the overlap is larger than threshold set mask to zero (ignore)
@@ -152,6 +154,7 @@ class YOLOLoss(nn.Module):
                     # Width and height
                     #print(best_n,anchors[best_n],anchors)
                     #print(anchors[best_n],gw,gh)
+                    #print(gw,anchors[best_n][0])
                     tw[b, best_n, gj, gi] = math.log(gw/anchors[best_n][0] + 1e-16)
                     th[b, best_n, gj, gi] = math.log(gh/anchors[best_n][1] + 1e-16)
                     # object
