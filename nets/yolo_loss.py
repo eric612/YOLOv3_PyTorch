@@ -140,6 +140,8 @@ class YOLOLoss(nn.Module):
                 # Find the best matching anchor box
                 #print(best_n)
                 #print(best_n,self.mask)
+                #print(np.array(anchors)[self.mask],anchors)
+                this_anchors = np.array(anchors)[self.mask]
                 if best_n in self.mask :
                     
                     best_n = self.mask.index(best_n)
@@ -153,10 +155,10 @@ class YOLOLoss(nn.Module):
                     #print(gx - gi,gy - gj)
                     # Width and height
                     #print(best_n,anchors[best_n],anchors)
-                    #print(anchors[best_n],gw,gh)
-                    #print(gw,anchors[best_n][0])
-                    tw[b, best_n, gj, gi] = math.log(gw/anchors[best_n][0] + 1e-16)
-                    th[b, best_n, gj, gi] = math.log(gh/anchors[best_n][1] + 1e-16)
+                    #print(anch_ious_this[best_n],gw,gh)
+                    #print(gw,gh,this_anchors[best_n])
+                    tw[b, best_n, gj, gi] = math.log(gw/this_anchors[best_n][0] + 1e-16)
+                    th[b, best_n, gj, gi] = math.log(gh/this_anchors[best_n][1] + 1e-16)
                     # object
                     tconf[b, best_n, gj, gi] = 1
                     # One-hot encoding of label
